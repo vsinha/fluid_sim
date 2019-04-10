@@ -1,39 +1,46 @@
-// struct Vec2D<T> {
-//     n_rows: usize,
-//     n_cols: usize,
-//     data: Vec<T>
-// }
+extern crate glutin_window;
+extern crate graphics;
+extern crate opengl_graphics;
+extern crate piston;
 
-// impl<T> Vec2D<T> {
-//     fn get(&self, row: usize, col: usize) -> &T {
-//          assert!(row < self.n_rows);
-//          assert!(col < self.n_cols);
-//          &self.data[row * self.n_cols + col]
-//     }
-// }
+use glutin_window::GlutinWindow as Window;
+use opengl_graphics::{GlGraphics, OpenGL};
+use piston::event_loop::*;
+use piston::input::*;
+use piston::window::WindowSettings;
 
 struct FluidSquare {
     size: u32,
-    dt: f32,
-    diff: f32,
-    visc: f32,
+    dt: f64,
+    diff: f64,
+    visc: f64,
+    iter: u32,
 
-    s: Vec<f32>,
-    density: Vec<f32>,
+    s: Vec<f64>,
+    density: Vec<f64>,
 
-    vx: Vec<f32>,
-    vy: Vec<f32>,
+    vx: Vec<f64>,
+    vy: Vec<f64>,
 
-    vx0: Vec<f32>,
-    vy0: Vec<f32>,
+    vx0: Vec<f64>,
+    vy0: Vec<f64>,
 }
 
 fn index(size: u32, x: u32, y: u32) -> usize {
+    let mut x = x;
+    let mut y = y;
+
+    if x > size - 1 {
+        x = size - 1
+    }
+    if y > size - 1 {
+        y = size - 1
+    }
     (x + y * size) as usize
 }
 
 impl FluidSquare {
-    fn new(size: u32, diffusion: f32, viscosity: f32, dt: f32) -> FluidSquare {
+    fn new(size: u32, diffusion: f64, viscosity: f64, dt: f64, iter: u32) -> FluidSquare {
         let n = size;
         let n_squared = (n * n) as usize;
         FluidSquare {
@@ -41,6 +48,7 @@ impl FluidSquare {
             dt,
             diff: diffusion,
             visc: viscosity,
+            iter,
             s: vec![0.0; n_squared],
             density: vec![0.0; n_squared],
             vx: vec![0.0; n_squared],
@@ -50,19 +58,19 @@ impl FluidSquare {
         }
     }
 
-    // fn add_density(&mut self, x: u32, y: u32, amount: f32) {
-    //     self.density[index(self.size, x, y)] += amount;
-    // }
+    fn add_density(&mut self, x: u32, y: u32, amount: f64) {
+        self.density[index(self.size, x, y)] += amount;
+    }
 
-    // fn add_velocity(&mut self, x: u32, y: u32, amount_x: f32, amount_y: f32) {
-    //     let index = index(self.size, x, y);
+    fn add_velocity(&mut self, x: u32, y: u32, amount_x: f64, amount_y: f64) {
+        let index = index(self.size, x, y);
 
-    //     self.vx[index] += amount_x;
-    //     self.vy[index] += amount_y;
-    // }
+        self.vx[index] += amount_x;
+        self.vy[index] += amount_y;
+    }
 }
 
-fn set_bnd(b: u32, x: &mut Vec<f32>, n: u32) {
+fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
     for i in 1..(n - 1) {
         if b == 2 {
             x[index(n, i, 0)] = -x[index(n, i, 1)];
@@ -89,7 +97,7 @@ fn set_bnd(b: u32, x: &mut Vec<f32>, n: u32) {
     x[index(n, n - 1, n - 1)] = 0.5 * (x[index(n, n - 2, n - 1)] + x[index(n, n - 1, n - 2)]);
 }
 
-fn lin_solve(b: u32, x: &mut Vec<f32>, x0: &Vec<f32>, a: f32, c: f32, iter: u32, n: u32) {
+fn lin_solve(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, a: f64, c: f64, iter: u32, n: u32) {
     let c_recip = 1.0 / c;
     for _k in 0..iter {
         for j in 1..(n - 1) {
@@ -108,16 +116,16 @@ fn lin_solve(b: u32, x: &mut Vec<f32>, x0: &Vec<f32>, a: f32, c: f32, iter: u32,
     }
 }
 
-fn diffuse(b: u32, x: &mut Vec<f32>, x0: &Vec<f32>, diff: f32, dt: f32, iter: u32, n: u32) {
-    let a = dt * diff * ((n as f32) - 2.) * ((n as f32) - 2.);
+fn diffuse(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, diff: f64, dt: f64, iter: u32, n: u32) {
+    let a = dt * diff * ((n as f64) - 2.) * ((n as f64) - 2.);
     lin_solve(b, x, x0, a, 1. + 6. * a, iter, n);
 }
 
 fn project(
-    veloc_x: &mut Vec<f32>,
-    veloc_y: &mut Vec<f32>,
-    p: &mut Vec<f32>,
-    div: &mut Vec<f32>,
+    veloc_x: &mut Vec<f64>,
+    veloc_y: &mut Vec<f64>,
+    p: &mut Vec<f64>,
+    div: &mut Vec<f64>,
     iter: u32,
     n: u32,
 ) {
@@ -127,7 +135,7 @@ fn project(
                 * (veloc_x[index(n, i + 1, j)] - veloc_x[index(n, i - 1, j)]
                     + veloc_y[index(n, i, j + 1)]
                     - veloc_y[index(n, i, j - 1)])
-                / (n as f32);
+                / (n as f64);
             p[index(n, i, j)] = 0.;
         }
     }
@@ -138,9 +146,9 @@ fn project(
     for j in 1..(n - 1) {
         for i in 1..(n - 1) {
             veloc_x[index(n, i, j)] -=
-                0.5 * (p[index(n, i + 1, j)] - p[index(n, i - 1, j)]) * (n as f32);
+                0.5 * (p[index(n, i + 1, j)] - p[index(n, i - 1, j)]) * (n as f64);
             veloc_y[index(n, i, j)] -=
-                0.5 * (p[index(n, i, j + 1)] - p[index(n, i, j - 1)]) * (n as f32);
+                0.5 * (p[index(n, i, j + 1)] - p[index(n, i, j - 1)]) * (n as f64);
         }
     }
     set_bnd(1, veloc_x, n);
@@ -149,31 +157,31 @@ fn project(
 
 fn advect(
     b: u32,
-    d: &mut Vec<f32>,
-    d0: &Vec<f32>,
-    veloc_x: &Vec<f32>,
-    veloc_y: &Vec<f32>,
-    dt: f32,
+    d: &mut Vec<f64>,
+    d0: &Vec<f64>,
+    veloc_x: &Vec<f64>,
+    veloc_y: &Vec<f64>,
+    dt: f64,
     n: u32,
 ) {
     let (mut i0, mut i1, mut j0, mut j1);
 
-    let dtx = dt * (n as f32 - 2.);
-    let dty = dt * (n as f32 - 2.);
+    let dtx = dt * (n as f64 - 2.);
+    let dty = dt * (n as f64 - 2.);
 
     let (mut s0, mut s1);
     let (mut t0, mut t1);
     let (mut tmp1, mut tmp2);
     let (mut x, mut y);
 
-    let nfloat = n as f32;
+    let nfloat = n as f64;
 
     for j in 1..(n - 1) {
         for i in 1..(n - 1) {
             tmp1 = dtx * veloc_x[index(n, i, j)];
             tmp2 = dty * veloc_y[index(n, i, j)];
-            x = (i as f32) - tmp1;
-            y = (j as f32) - tmp2;
+            x = (i as f64) - tmp1;
+            y = (j as f64) - tmp2;
 
             if x < 0.5 {
                 x = 0.5
@@ -216,16 +224,17 @@ fn fluid_step(cube: &mut FluidSquare) {
     let visc = cube.visc;
     let diff = cube.diff;
     let dt = cube.dt;
+    let iter = cube.iter;
 
-    diffuse(1, &mut cube.vx0, &cube.vx, visc, dt, 4, n);
-    diffuse(2, &mut cube.vy0, &cube.vy, visc, dt, 4, n);
+    diffuse(1, &mut cube.vx0, &cube.vx, visc, dt, iter, n);
+    diffuse(2, &mut cube.vy0, &cube.vy, visc, dt, iter, n);
 
     project(
         &mut cube.vx0,
         &mut cube.vy0,
         &mut cube.vx,
         &mut cube.vy,
-        4,
+        iter,
         n,
     );
 
@@ -237,24 +246,97 @@ fn fluid_step(cube: &mut FluidSquare) {
         &mut cube.vy,
         &mut cube.vx0,
         &mut cube.vy0,
-        4,
+        iter,
         n,
     );
 
-    diffuse(0, &mut cube.s, &cube.density, diff, dt, 4, n);
+    diffuse(0, &mut cube.s, &cube.density, diff, dt, iter, n);
     advect(0, &mut cube.density, &cube.s, &cube.vx, &cube.vy, dt, n);
 }
 
-fn main() {
-    let size = 128;
-    // let iter = 16;
+pub struct App {
+    gl: GlGraphics,
+    fluid: FluidSquare,
+    width: u32,
+    height: u32,
+    scale: u32,
+}
 
+impl App {
+    fn render(&mut self, args: &RenderArgs) {
+        use graphics::*;
+
+        let fluid = &self.fluid;
+        let square = rectangle::square(0.0, 0.0, self.scale as f64);
+        let scale = self.scale;
+
+        self.gl.draw(args.viewport(), |c, gl| {
+            // Clear the screen.
+            clear([0., 0., 0., 0.0], gl);
+
+            let n = fluid.size;
+            for i in 0..n {
+                for j in 0..n {
+                    let x = i * scale;
+                    let y = j * scale;
+                    let d = fluid.density[index(n, i, j)] as f32;
+                    let color = [d / 2., d, d / 2., 1.];
+                    let transform = c.transform.trans(x as f64, y as f64);
+                    rectangle(color, square, transform, gl);
+                }
+            }
+        });
+    }
+
+    fn update(&mut self, _args: &UpdateArgs) {
+        let cx = (0.5 * (self.width / self.scale) as f64) as u32;
+        let cy = (0.5 * (self.height / self.scale) as f64) as u32;
+
+        FluidSquare::add_density(&mut self.fluid, cx, cy, 0.00001);
+        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 10., 1.);
+
+        fluid_step(&mut self.fluid);
+    }
+}
+
+fn main() {
+    // Change this to OpenGL::V2_1 if not working.
+    let opengl = OpenGL::V3_2;
+
+    let size = 128;
+    let scale = 4;
+    let width = size * scale;
+    let height = size * scale;
+
+    // Create an Glutin window.
+    let mut window: Window = WindowSettings::new("Something", [width, height])
+        .opengl(opengl)
+        .exit_on_esc(true)
+        .build()
+        .unwrap();
+
+    let iter = 4;
     let diffusion = 0.2;
     let viscosity = 0.;
-    let dt = 0.0000001;
-    let mut fluid = FluidSquare::new(size, diffusion, viscosity, dt);
+    let dt = 0.000001;
 
-    loop {
-        fluid_step(&mut fluid);
+    // Create a new game and run it.
+    let mut app = App {
+        gl: GlGraphics::new(opengl),
+        fluid: FluidSquare::new(size, diffusion, viscosity, dt, iter),
+        width,
+        height,
+        scale,
+    };
+
+    let mut events = Events::new(EventSettings::new());
+    while let Some(e) = events.next(&mut window) {
+        if let Some(r) = e.render_args() {
+            app.render(&r);
+        }
+
+        if let Some(u) = e.update_args() {
+            app.update(&u);
+        }
     }
 }
