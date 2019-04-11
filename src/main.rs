@@ -93,7 +93,7 @@ impl FluidSquare {
 // }
 
 fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
-    let _guard = flame::start_guard("set_bnd");
+    // let _guard = flame::start_guard("set_bnd");
     for i in 1..(n - 1) {
         if b == 2 {
             x[index(n, i, 0)] = -x[index(n, i, 1)];
@@ -121,10 +121,10 @@ fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
 }
 
 fn lin_solve(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, a: f64, c: f64, iter: u32, n: u32) {
-    let _guard = flame::start_guard("lin_solve");
+    // let _guard = flame::start_guard("lin_solve");
     let c_recip = 1.0 / c;
     for _k in 0..iter {
-        let _guard = flame::start_guard("iter");
+        // let _guard = flame::start_guard("iter");
         for j in 1..(n - 1) {
             for i in 1..(n - 1) {
                 x[index(n, i, j)] = (x0[index(n, i, j)]
@@ -142,7 +142,7 @@ fn lin_solve(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, a: f64, c: f64, iter: u32,
 }
 
 fn diffuse(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, diff: f64, dt: f64, iter: u32, n: u32) {
-    let _guard = flame::start_guard("diffuse");
+    // let _guard = flame::start_guard("diffuse");
     let a = dt * diff * ((n as f64) - 2.) * ((n as f64) - 2.);
     lin_solve(b, x, x0, a, 1. + 6. * a, iter, n);
 }
@@ -155,7 +155,7 @@ fn project(
     iter: u32,
     n: u32,
 ) {
-    let _guard = flame::start_guard("project");
+    // let _guard = flame::start_guard("project");
     for j in 1..(n - 1) {
         for i in 1..(n - 1) {
             div[index(n, i, j)] = -0.5
@@ -191,7 +191,7 @@ fn advect(
     dt: f64,
     n: u32,
 ) {
-    let _guard = flame::start_guard("advect");
+    // let _guard = flame::start_guard("advect");
     let (mut i0, mut i1, mut j0, mut j1);
 
     let dtx = dt * (n - 2) as f64;
@@ -246,7 +246,7 @@ fn advect(
 }
 
 fn fluid_step(cube: &mut FluidSquare) {
-    let _guard = flame::start_guard("fluid_step");
+    // let _guard = flame::start_guard("fluid_step");
     let n = cube.size;
     let visc = cube.visc;
     let diff = cube.diff;
@@ -291,7 +291,7 @@ pub struct App {
 
 impl App {
     fn render(&mut self, args: &RenderArgs) {
-        let _guard = flame::start_guard("render");
+        // let _guard = flame::start_guard("render");
 
         use graphics::*;
 
@@ -352,7 +352,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let iter = 16;
+    let iter = 4;
     let diffusion = 0.2;
     let viscosity = 0.;
     let dt = 0.0000001;
@@ -378,7 +378,7 @@ fn main() {
         }
 
         i += 1;
-        if (i % 100 == 0) {
+        if i % 100 == 0 {
             flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
         }
     }
