@@ -27,10 +27,10 @@ struct FluidSquare {
     vy0: Vec<f64>,
 }
 
-fn index(size: u32, x: u32, y: u32) -> usize {
-    let x = constrain(x, 0, size - 1);
-    let y = constrain(y, 0, size - 1);
-    (x + y * size) as usize
+fn index(n: u32, x: u32, y: u32) -> usize {
+    let x = constrain(x, 0, n - 1);
+    let y = constrain(y, 0, n - 1);
+    (x + y * n) as usize
 }
 
 fn constrain<T: PartialOrd>(val: T, min: T, max: T) -> T {
@@ -74,6 +74,22 @@ impl FluidSquare {
     }
 }
 
+// fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
+//     for i in 1..(n-1) {
+//         x[index(n, i, 0  )] = b == 2 ? -x[index(n, i, 1  )] : x[index(n, i, 1 )];
+//         x[index(n, i, n-1)] = b == 2 ? -x[index(n, i, n-2)] : x[index(n, i, n-2)];
+//     }
+//     for j in 1..(n-1) {
+//         x[index(n, 0, j)] = b == 1 ? -x[index(n, 1, j)] : x[index(n, 1, j)];
+//         x[index(n, n-1, j)] = b == 1 ? -x[index(n, n-2, j)] : x[index(n, n-2, j)];
+//     }
+
+//     x[index(n, 0, 0)] = 0.5f * (x[index(n, 1, 0)] + x[index(n, 0, 1)]);
+//     x[index(n, 0, n-1)] = 0.5f * (x[index(n, 1, n-1)] + x[index(n, 0, n-2)]);
+//     x[index(n, n-1, 0)] = 0.5f * (x[index(n, n-2, 0)] + x[index(n, n-1, 1)]);
+//     x[index(n, n-1, n-1)] = 0.5f * (x[index(n, n-2, n-1)] + x[index(n, n-1, n-2)]);
+// }
+
 fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
     for i in 1..(n - 1) {
         if b == 2 {
@@ -86,7 +102,7 @@ fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
     }
 
     for j in 1..(n - 1) {
-        if b == 2 {
+        if b == 1 {
             x[index(n, 0, j)] = -x[index(n, 1, j)];
             x[index(n, n - 1, j)] = -x[index(n, n - 2, j)];
         } else {
