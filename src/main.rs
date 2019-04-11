@@ -1,4 +1,4 @@
-extern crate flame;
+// extern crate flame;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -10,7 +10,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::*;
 use piston::input::*;
 use piston::window::WindowSettings;
-use std::fs::File;
+// use std::fs::File;
 
 struct FluidSquare {
     size: u32,
@@ -367,7 +367,7 @@ fn main() {
     };
 
     let mut events = Events::new(EventSettings::new());
-    let mut i = 0;
+    // let mut i = 0;
     while let Some(e) = events.next(&mut window) {
         if let Some(r) = e.render_args() {
             app.render(&r);
@@ -377,9 +377,9 @@ fn main() {
             app.update(&u);
         }
 
-        i += 1;
-        if i % 100 == 0 {
-            flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
-        }
+        // i += 1;
+        // if i % 100 == 0 {
+        //     flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+        // }
     }
 }
