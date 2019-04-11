@@ -1,3 +1,4 @@
+extern crate flame;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -9,6 +10,7 @@ use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::*;
 use piston::input::*;
 use piston::window::WindowSettings;
+use std::fs::File;
 
 struct FluidSquare {
     size: u32,
@@ -91,6 +93,7 @@ impl FluidSquare {
 // }
 
 fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
+    let _guard = flame::start_guard("set_bnd");
     for i in 1..(n - 1) {
         if b == 2 {
             x[index(n, i, 0)] = -x[index(n, i, 1)];
@@ -118,8 +121,10 @@ fn set_bnd(b: u32, x: &mut Vec<f64>, n: u32) {
 }
 
 fn lin_solve(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, a: f64, c: f64, iter: u32, n: u32) {
+    let _guard = flame::start_guard("lin_solve");
     let c_recip = 1.0 / c;
     for _k in 0..iter {
+        let _guard = flame::start_guard("iter");
         for j in 1..(n - 1) {
             for i in 1..(n - 1) {
                 x[index(n, i, j)] = (x0[index(n, i, j)]
@@ -137,6 +142,7 @@ fn lin_solve(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, a: f64, c: f64, iter: u32,
 }
 
 fn diffuse(b: u32, x: &mut Vec<f64>, x0: &Vec<f64>, diff: f64, dt: f64, iter: u32, n: u32) {
+    let _guard = flame::start_guard("diffuse");
     let a = dt * diff * ((n as f64) - 2.) * ((n as f64) - 2.);
     lin_solve(b, x, x0, a, 1. + 6. * a, iter, n);
 }
@@ -149,6 +155,7 @@ fn project(
     iter: u32,
     n: u32,
 ) {
+    let _guard = flame::start_guard("project");
     for j in 1..(n - 1) {
         for i in 1..(n - 1) {
             div[index(n, i, j)] = -0.5
@@ -184,10 +191,11 @@ fn advect(
     dt: f64,
     n: u32,
 ) {
+    let _guard = flame::start_guard("advect");
     let (mut i0, mut i1, mut j0, mut j1);
 
-    let dtx = dt * (n as f64 - 2.);
-    let dty = dt * (n as f64 - 2.);
+    let dtx = dt * (n - 2) as f64;
+    let dty = dt * (n - 2) as f64;
 
     let (mut s0, mut s1);
     let (mut t0, mut t1);
@@ -230,16 +238,15 @@ fn advect(
             let j0i = j0 as u32;
             let j1i = j1 as u32;
 
-            d[index(n, i, j)] = s0 * t0 * d0[index(n, i0i, j0i)]
-                + t1 * d0[index(n, i0i, j1i)]
-                + s1 * t0 * d0[index(n, i1i, j0i)]
-                + t1 * d0[index(n, i1i, j1i)];
+            d[index(n, i, j)] = s0 * (t0 * d0[index(n, i0i, j0i)] + t1 * d0[index(n, i0i, j1i)])
+                + s1 * (t0 * d0[index(n, i1i, j0i)] + t1 * d0[index(n, i1i, j1i)]);
         }
     }
     set_bnd(b, d, n);
 }
 
 fn fluid_step(cube: &mut FluidSquare) {
+    let _guard = flame::start_guard("fluid_step");
     let n = cube.size;
     let visc = cube.visc;
     let diff = cube.diff;
@@ -284,6 +291,8 @@ pub struct App {
 
 impl App {
     fn render(&mut self, args: &RenderArgs) {
+        let _guard = flame::start_guard("render");
+
         use graphics::*;
 
         let fluid = &self.fluid;
@@ -301,10 +310,10 @@ impl App {
                     let y = j * scale;
                     let transform = c.transform.trans(x as f64, y as f64);
 
-                    let d = fluid.density[index(n, i, j)];
-                    let h = (d + 50. % 255.) as f32;
-                    let s = 200. as f32;
-                    let v = d as f32;
+                    let d = fluid.density[index(n, i, j)] as f32;
+                    let h = (d + 50. % 255.) / 255.0;
+                    let s = 200. / 255.;
+                    let v = d / 255.;
                     let hsv = palette::Hsv::new(h, s, v);
                     let rgb: palette::rgb::Rgb = palette::rgb::Rgb::from(hsv);
                     let color = [rgb.red, rgb.green, rgb.blue, 1.];
@@ -319,8 +328,9 @@ impl App {
         let cx = (0.5 * (self.width / self.scale) as f64) as u32;
         let cy = (0.5 * (self.height / self.scale) as f64) as u32;
 
-        FluidSquare::add_density(&mut self.fluid, cx, cy, 0.00001);
-        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 1., 1.);
+        FluidSquare::add_density(&mut self.fluid, cx, cy, 100.);
+
+        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 1000., 1000000.);
 
         fluid_step(&mut self.fluid);
     }
@@ -342,10 +352,10 @@ fn main() {
         .build()
         .unwrap();
 
-    let iter = 4;
+    let iter = 16;
     let diffusion = 0.2;
     let viscosity = 0.;
-    let dt = 0.000001;
+    let dt = 0.0000001;
 
     // Create a new game and run it.
     let mut app = App {
@@ -357,6 +367,7 @@ fn main() {
     };
 
     let mut events = Events::new(EventSettings::new());
+    let mut i = 0;
     while let Some(e) = events.next(&mut window) {
         if let Some(r) = e.render_args() {
             app.render(&r);
@@ -364,6 +375,11 @@ fn main() {
 
         if let Some(u) = e.update_args() {
             app.update(&u);
+        }
+
+        i += 1;
+        if (i % 100 == 0) {
+            flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
         }
     }
 }
