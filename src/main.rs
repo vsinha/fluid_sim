@@ -1,6 +1,7 @@
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
+extern crate palette;
 extern crate piston;
 
 use glutin_window::GlutinWindow as Window;
@@ -27,16 +28,19 @@ struct FluidSquare {
 }
 
 fn index(size: u32, x: u32, y: u32) -> usize {
-    let mut x = x;
-    let mut y = y;
-
-    if x > size - 1 {
-        x = size - 1
-    }
-    if y > size - 1 {
-        y = size - 1
-    }
+    let x = constrain(x, 0, size - 1);
+    let y = constrain(y, 0, size - 1);
     (x + y * size) as usize
+}
+
+fn constrain<T: PartialOrd>(val: T, min: T, max: T) -> T {
+    if val < min {
+        min
+    } else if val >= max {
+        max
+    } else {
+        val
+    }
 }
 
 impl FluidSquare {
@@ -279,9 +283,16 @@ impl App {
                 for j in 0..n {
                     let x = i * scale;
                     let y = j * scale;
-                    let d = fluid.density[index(n, i, j)] as f32;
-                    let color = [d / 2., d, d / 2., 1.];
                     let transform = c.transform.trans(x as f64, y as f64);
+
+                    let d = fluid.density[index(n, i, j)];
+                    let h = (d + 50. % 255.) as f32;
+                    let s = 200. as f32;
+                    let v = d as f32;
+                    let hsv = palette::Hsv::new(h, s, v);
+                    let rgb: palette::rgb::Rgb = palette::rgb::Rgb::from(hsv);
+                    let color = [rgb.red, rgb.green, rgb.blue, 1.];
+
                     rectangle(color, square, transform, gl);
                 }
             }
@@ -293,7 +304,7 @@ impl App {
         let cy = (0.5 * (self.height / self.scale) as f64) as u32;
 
         FluidSquare::add_density(&mut self.fluid, cx, cy, 0.00001);
-        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 10., 1.);
+        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 1., 1.);
 
         fluid_step(&mut self.fluid);
     }
