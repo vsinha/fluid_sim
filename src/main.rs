@@ -4,12 +4,14 @@ extern crate graphics;
 extern crate opengl_graphics;
 extern crate palette;
 extern crate piston;
+extern crate rand;
 
 use glutin_window::GlutinWindow as Window;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::*;
 use piston::input::*;
 use piston::window::WindowSettings;
+use rand::Rng;
 // use std::fs::File;
 
 struct FluidSquare {
@@ -328,9 +330,14 @@ impl App {
         let cx = (0.5 * (self.width / self.scale) as f64) as u32;
         let cy = (0.5 * (self.height / self.scale) as f64) as u32;
 
-        FluidSquare::add_density(&mut self.fluid, cx, cy, 100.);
+        for i in 0..2 {
+            for j in 0..2 {
+                let amount = rand::thread_rng().gen_range(50, 150);
+                FluidSquare::add_density(&mut self.fluid, cx + i, cy + j, amount as f64);
+            }
+        }
 
-        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 1000., 1000000.);
+        FluidSquare::add_velocity(&mut self.fluid, cx, cy, 1., 1.);
 
         fluid_step(&mut self.fluid);
     }
@@ -355,7 +362,7 @@ fn main() {
     let iter = 4;
     let diffusion = 0.2;
     let viscosity = 0.;
-    let dt = 0.0000001;
+    let dt = 0.00001;
 
     // Create a new game and run it.
     let mut app = App {
